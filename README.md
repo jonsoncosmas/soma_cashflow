@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Soma Cashflow
 
 Multi-tenant finance tracking web app (PHP + MariaDB) supporting multiple
@@ -36,3 +37,6 @@ moving to the next:
 - **Phase 8** — Business photo gallery
 - **Phase 9** — Offline sync (IndexedDB + idempotent upload)
 - **Phase 10** — PWA (manifest, service worker, installability)
+=======
+# soma_cashflow
+>>>>>>> 47f011f33ef0f37b7405b147dfdae957eea20fc9
