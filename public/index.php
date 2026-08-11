@@ -44,5 +44,6 @@ foreach ($tables as $table) {
         <?php endforeach; ?>
     </table>
     <p>If all three tables show OK, Phase 0 is complete.</p>
+    <p><a href="/soma_cashflow/public/register.php">Register</a> &middot; <a href="/soma_cashflow/public/login.php">Login</a></p>
 </body>
 </html>
