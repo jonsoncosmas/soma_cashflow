@@ -1,0 +1,11 @@
+# Local config with real DB credentials
+config/config.php
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
