@@ -65,24 +65,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Register - Soma Cashflow';
 require __DIR__ . '/../includes/header.php';
 ?>
-<div class="card">
-    <h2>Create your account</h2>
-    <?php foreach ($errors as $e): ?>
-        <div class="flash error"><?= h($e) ?></div>
-    <?php endforeach; ?>
-    <form method="post" action="/soma_cashflow/public/register.php">
-        <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
-        <label for="name">Full name</label>
-        <input type="text" id="name" name="name" value="<?= h($_POST['name'] ?? '') ?>" required>
+<div class="auth-wrap">
+    <div class="brand-mark">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="24" height="24" rx="6" fill="var(--brand-100)"/>
+            <path d="M6 15L10 10L13 13L18 7" stroke="var(--brand-700)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 7H18V11" stroke="var(--brand-700)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Soma Cashflow
+    </div>
+    <div class="card">
+        <h2>Create your account</h2>
+        <p class="muted">Start tracking income, expenses, and cash flow across all your businesses.</p>
+        <?php foreach ($errors as $e): ?>
+            <div class="flash error"><?= h($e) ?></div>
+        <?php endforeach; ?>
+        <form method="post" action="/soma_cashflow/public/register.php">
+            <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+            <label for="name">Full name</label>
+            <input type="text" id="name" name="name" value="<?= h($_POST['name'] ?? '') ?>" required>
 
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" value="<?= h($_POST['email'] ?? '') ?>" required>
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="<?= h($_POST['email'] ?? '') ?>" required>
 
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" required minlength="6">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required minlength="6">
 
-        <button type="submit">Create account</button>
-    </form>
-    <p class="muted">Already have an account? <a class="link" href="/soma_cashflow/public/login.php">Log in</a></p>
+            <button type="submit">Create account</button>
+        </form>
+        <p class="muted" style="margin-top:16px;">Already have an account? <a class="link" href="/soma_cashflow/public/login.php">Log in</a></p>
+    </div>
 </div>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

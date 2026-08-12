@@ -27,13 +27,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $org) {
     }
 
     if (!$errors) {
+        $stmt = $pdo->prepare('SELECT id FROM businesses WHERE organization_id = ? AND name = ?');
+        $stmt->execute([$org['id'], $bizName]);
+        if ($stmt->fetch()) {
+            $errors[] = 'You already have a business named "' . $bizName . '". Choose a different name.';
+        }
+    }
+
+    if (!$errors) {
         $stmt = $pdo->prepare(
             'INSERT INTO businesses (organization_id, name, description) VALUES (?, ?, ?)'
         );
-        $stmt->execute([$org['id'], $bizName, $bizDesc ?: null]);
-        flash_set('success', 'Business "' . $bizName . '" created.');
-        header('Location: /soma_cashflow/public/dashboard.php');
-        exit;
+        try {
+            $stmt->execute([$org['id'], $bizName, $bizDesc ?: null]);
+            flash_set('success', 'Business "' . $bizName . '" created.');
+            header('Location: /soma_cashflow/public/dashboard.php');
+            exit;
+        } catch (PDOException $e) {
+            // Catches the race condition where two requests slip past the check above
+            // at the same instant, and is also the safety net if the DB unique
+            // constraint (sql/002_business_name_unique.sql) is the only thing that catches it.
+            $errors[] = 'You already have a business named "' . $bizName . '". Choose a different name.';
+        }
     }
 }
 
@@ -48,8 +63,9 @@ $pageTitle = 'Dashboard - Soma Cashflow';
 require __DIR__ . '/../includes/header.php';
 ?>
 <div class="card">
-    <h2>Your workspace</h2>
-    <p class="muted"><?= h($org['name'] ?? 'No organization found') ?></p>
+    <span style="display:inline-block; background:var(--brand-100); color:var(--brand-700); font-size:0.72rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; padding:4px 10px; border-radius:20px; margin-bottom:10px;">Workspace</span>
+    <h2 style="margin-bottom:2px;"><?= h($org['name'] ?? 'No organization found') ?></h2>
+    <p class="muted" style="margin-top:2px;"><?= count($businesses) ?> business<?= count($businesses) === 1 ? '' : 'es' ?> tracked</p>
 </div>
 
 <div class="card">
@@ -72,7 +88,10 @@ require __DIR__ . '/../includes/header.php';
 <div class="card">
     <h2>Your businesses</h2>
     <?php if (!$businesses): ?>
-        <p class="muted">No businesses yet. Create one above.</p>
+        <div style="text-align:center; padding:24px 10px;">
+            <div style="font-size:2rem; margin-bottom:6px;">🏢</div>
+            <p class="muted" style="margin:0;">No businesses yet &mdash; create your first one above.</p>
+        </div>
     <?php else: ?>
         <table>
             <tr><th>Name</th><th>Description</th><th>Created</th></tr>
