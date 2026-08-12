@@ -1,6 +1,6 @@
 <?php $user = current_user(); ?>
 <?php if ($user): ?>
-    </div>
+    </main>
 </div>
 <?php else: ?>
 </main>

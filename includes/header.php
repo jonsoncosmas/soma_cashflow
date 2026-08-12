@@ -117,6 +117,24 @@ function nav_active(string $path, string $needle): string
 
         .app-main { margin-left: 252px; flex: 1; padding: 38px 44px 60px; max-width: 980px; }
 
+        /* ---------- Mobile top bar (shown only when sidebar collapses) ---------- */
+        .mobile-topbar {
+            display: none;
+            position: sticky; top: 0; z-index: 20;
+            background: linear-gradient(135deg, var(--brand-900) 0%, var(--brand-700) 100%);
+            color: #fff; padding: 12px 16px; align-items: center; justify-content: space-between;
+        }
+        .mobile-topbar .brand { font-size: 1rem; }
+        .hamburger-btn {
+            background: rgba(255,255,255,0.14); border: none; color: #fff; width: 38px; height: 38px;
+            border-radius: 9px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .sidebar-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(5,20,18,0.5); z-index: 15;
+        }
+        body.sidebar-open .sidebar-overlay { display: block; }
+        body.sidebar-open .sidebar { transform: translateX(0); }
+
         /* ---------- Shared components ---------- */
         main.public-main { max-width: 680px; margin: 40px auto; padding: 0 20px 60px; }
         .card {
@@ -162,6 +180,10 @@ function nav_active(string $path, string $needle): string
         .flash.error { background: var(--error-bg); color: var(--error-fg); border-left-color: var(--error-fg); }
         .muted { color: var(--ink-600); font-size: 0.87rem; }
         table { width: 100%; border-collapse: collapse; }
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        @media (max-width: 640px) {
+            .table-scroll table { min-width: 560px; }
+        }
         table th {
             text-align: left; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.04em;
             color: var(--ink-400); font-weight: 600; padding: 0 10px 10px; border-bottom: 1.5px solid var(--border);
@@ -238,28 +260,59 @@ function nav_active(string $path, string $needle): string
         .feature-card p { font-size: 0.82rem; color: var(--ink-600); margin: 0; }
 
         @media (max-width: 860px) {
-            .sidebar { display: none; }
-            .app-main { margin-left: 0; padding: 24px 18px 50px; }
+            .sidebar {
+                display: flex;
+                transform: translateX(-100%);
+                transition: transform 0.22s ease;
+                z-index: 25;
+                box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+            }
+            .mobile-topbar { display: flex; }
+            .app-main { margin-left: 0; padding: 22px 18px 50px; }
             .stat-grid, .biz-grid, .feature-grid { grid-template-columns: 1fr 1fr; }
             .form-grid { grid-template-columns: 1fr; }
+            .hero { padding: 30px 22px; }
+            .sidebar-close-btn { display: block !important; }
         }
         @media (max-width: 520px) {
             .stat-grid, .biz-grid, .feature-grid { grid-template-columns: 1fr; }
+            .card { padding: 20px 16px; }
+            .hero { padding: 24px 18px; }
+            .hero h1 { font-size: 1.4rem; }
+            .auth-wrap { margin-top: 30px; }
+            .auth-wrap .card { padding: 24px 20px; }
         }
     </style>
 </head>
 <body>
 <?php if ($user): ?>
+<div class="mobile-topbar">
+    <a class="brand" href="/soma_cashflow/public/dashboard.php">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="24" height="24" rx="6" fill="rgba(255,255,255,0.16)"/>
+            <path d="M6 15L10 10L13 13L18 7" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 7H18V11" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Soma Cashflow
+    </a>
+    <button class="hamburger-btn" onclick="document.body.classList.add('sidebar-open')" aria-label="Open menu">&#9776;</button>
+</div>
+<div class="sidebar-overlay" onclick="document.body.classList.remove('sidebar-open')"></div>
 <div class="app-shell">
-    <aside class="sidebar">
-        <a class="brand" href="/soma_cashflow/public/dashboard.php">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="24" height="24" rx="6" fill="rgba(255,255,255,0.16)"/>
-                <path d="M6 15L10 10L13 13L18 7" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M14 7H18V11" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Soma Cashflow
-        </a>
+    <aside class="sidebar" aria-label="Main navigation">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+            <a class="brand" href="/soma_cashflow/public/dashboard.php">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="24" height="24" rx="6" fill="rgba(255,255,255,0.16)"/>
+                    <path d="M6 15L10 10L13 13L18 7" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M14 7H18V11" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Soma Cashflow
+            </a>
+            <button onclick="document.body.classList.remove('sidebar-open')" aria-label="Close menu"
+                    style="display:none; background:none; border:none; color:#fff; font-size:1.3rem; cursor:pointer;"
+                    class="sidebar-close-btn">&times;</button>
+        </div>
         <nav>
             <a class="<?= nav_active((string) $currentPath, 'dashboard.php') ?>" href="/soma_cashflow/public/dashboard.php">
                 <span class="navicon">&#9635;</span> Dashboard
@@ -276,7 +329,7 @@ function nav_active(string $path, string $needle): string
             </div>
         </div>
     </aside>
-    <div class="app-main">
+    <main class="app-main">
 <?php else: ?>
 <header class="topbar">
     <a class="brand" href="/soma_cashflow/public/">

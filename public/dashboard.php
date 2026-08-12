@@ -78,11 +78,11 @@ require __DIR__ . '/../includes/header.php';
     <p>Here's the combined position across all your businesses in <?= h($org['name'] ?? 'your workspace') ?>.</p>
     <div style="display:flex; gap:36px; flex-wrap:wrap; position:relative;">
         <div>
-            <div style="font-size:0.8rem; color:rgba(255,255,255,0.7); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Combined balance</div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.88); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Combined balance</div>
             <div style="font-size:2rem; font-weight:800; margin-top:2px;"><?= number_format($totalBalance, 2) ?></div>
         </div>
         <div>
-            <div style="font-size:0.8rem; color:rgba(255,255,255,0.7); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Businesses</div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.88); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Businesses</div>
             <div style="font-size:2rem; font-weight:800; margin-top:2px;"><?= count($businesses) ?></div>
         </div>
     </div>

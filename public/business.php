@@ -115,7 +115,7 @@ require __DIR__ . '/../includes/header.php';
         <p><?= h($business['description']) ?></p>
     <?php endif; ?>
     <div style="position:relative;">
-        <div style="font-size:0.8rem; color:rgba(255,255,255,0.7); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Current balance</div>
+        <div style="font-size:0.8rem; color:rgba(255,255,255,0.88); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Current balance</div>
         <div style="font-size:2.4rem; font-weight:800; margin-top:2px;"><?= number_format($balance, 2) ?></div>
     </div>
 </div>
@@ -195,6 +195,7 @@ require __DIR__ . '/../includes/header.php';
             <p class="muted" style="margin:0;">No transactions yet &mdash; add your first one above.</p>
         </div>
     <?php else: ?>
+        <div class="table-scroll">
         <table>
             <tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th style="text-align:right;">Amount</th></tr>
             <?php foreach ($transactions as $t):
@@ -211,6 +212,7 @@ require __DIR__ . '/../includes/header.php';
             </tr>
             <?php endforeach; ?>
         </table>
+        </div>
     <?php endif; ?>
 </div>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
