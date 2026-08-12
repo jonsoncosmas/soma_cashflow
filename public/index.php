@@ -17,21 +17,41 @@ foreach ($tables as $table) {
         $status[$table] = ['ok' => false, 'error' => $e->getMessage()];
     }
 }
-
 $allOk = !in_array(false, array_column($status, 'ok'), true);
+
 $pageTitle = 'Soma Cashflow';
 require __DIR__ . '/../includes/header.php';
 ?>
-<div class="card">
-    <h2>Track every shilling, across every business</h2>
-    <p class="muted">Personal income, business ledgers, savings growth, and multi-user access &mdash; all in one place.</p>
+<div class="hero">
+    <span class="eyebrow" style="background:rgba(255,255,255,0.16); color:#fff;">Finance tracking, built for real businesses</span>
+    <h1>Track every shilling, across every business you run</h1>
+    <p>Personal income, business ledgers, inter-business funding, savings growth, and multi-user access &mdash; all in one place, offline-ready.</p>
     <?php if (!current_user()): ?>
-        <a href="/soma_cashflow/public/register.php"><button type="button">Get started</button></a>
+        <a class="btn" href="/soma_cashflow/public/register.php">Get started free</a>
     <?php else: ?>
-        <a href="/soma_cashflow/public/dashboard.php"><button type="button">Go to dashboard</button></a>
+        <a class="btn" href="/soma_cashflow/public/dashboard.php">Go to dashboard</a>
     <?php endif; ?>
 </div>
 
+<div class="feature-grid">
+    <div class="feature-card">
+        <div class="f-icon">🏢</div>
+        <h3>Multiple businesses</h3>
+        <p>Track each business separately, then see them combined.</p>
+    </div>
+    <div class="feature-card">
+        <div class="f-icon">🔁</div>
+        <h3>Fund flows</h3>
+        <p>Move money between businesses or from personal income.</p>
+    </div>
+    <div class="feature-card">
+        <div class="f-icon">📊</div>
+        <h3>Real statements</h3>
+        <p>Income statements and cash flow, any date range.</p>
+    </div>
+</div>
+
+<?php if (!$allOk): ?>
 <div class="card">
     <h2>System status</h2>
     <p class="muted">Database connection: <strong style="color:var(--success-fg)">Connected</strong></p>
@@ -52,4 +72,5 @@ require __DIR__ . '/../includes/header.php';
         <?php endforeach; ?>
     </table>
 </div>
+<?php endif; ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
