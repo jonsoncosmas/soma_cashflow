@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/../includes/session.php';
 require __DIR__ . '/../includes/helpers.php';
 require __DIR__ . '/../includes/business_access.php';
+require __DIR__ . '/../includes/ledger_helpers.php';
 require_login();
 $pdo = require __DIR__ . '/../config/database.php';
 $user = current_user();
@@ -91,17 +92,75 @@ $totals = ['income' => 0.0, 'expense' => 0.0, 'loan_received' => 0.0, 'loan_give
 foreach ($stmt->fetchAll() as $row) {
     $totals[$row['type']] = (float) $row['total'];
 }
-$balance = $totals['income'] + $totals['loan_received'] - $totals['expense'] - $totals['loan_given'];
 
-// Transaction history (most recent first)
+$stmt = $pdo->prepare('SELECT COALESCE(SUM(amount), 0) AS t FROM fund_transfers WHERE to_type = ? AND to_business_id = ?');
+$stmt->execute(['business', $business['id']]);
+$transferIn = (float) $stmt->fetch()['t'];
+
+$stmt = $pdo->prepare('SELECT COALESCE(SUM(amount), 0) AS t FROM fund_transfers WHERE from_type = ? AND from_business_id = ?');
+$stmt->execute(['business', $business['id']]);
+$transferOut = (float) $stmt->fetch()['t'];
+
+$balance = $totals['income'] + $totals['loan_received'] - $totals['expense'] - $totals['loan_given'] + $transferIn - $transferOut;
+
+// Transaction history (own transactions + transfers involving this business), most recent first
 $stmt = $pdo->prepare(
-    'SELECT type, category, amount, description, transaction_date
+    'SELECT type, category, amount, description, transaction_date AS date
      FROM transactions WHERE business_id = ?
      ORDER BY transaction_date DESC, id DESC
      LIMIT 100'
 );
 $stmt->execute([$business['id']]);
-$transactions = $stmt->fetchAll();
+$history = [];
+foreach ($stmt->fetchAll() as $row) {
+    $isInflow = in_array($row['type'], ['income', 'loan_received'], true);
+    $history[] = [
+        'date'     => $row['date'],
+        'pillType' => $row['type'],
+        'label'    => $typeLabels[$row['type']] ?? $row['type'],
+        'icon'     => $typeIcons[$row['type']] ?? '',
+        'category' => $row['category'],
+        'desc'     => $row['description'],
+        'amount'   => (float) $row['amount'],
+        'inflow'   => $isInflow,
+    ];
+}
+
+// Business name lookup for transfer labels
+$stmt = $pdo->prepare(
+    'SELECT b.id, b.name FROM businesses b
+     INNER JOIN organizations o ON o.id = b.organization_id
+     WHERE o.owner_user_id = ?'
+);
+$stmt->execute([$user['id']]);
+$businessNames = array_column($stmt->fetchAll(), 'name', 'id');
+
+$stmt = $pdo->prepare(
+    'SELECT from_type, from_business_id, to_type, to_business_id, amount, description, transfer_date AS date
+     FROM fund_transfers
+     WHERE (from_type = "business" AND from_business_id = ?) OR (to_type = "business" AND to_business_id = ?)
+     ORDER BY transfer_date DESC, id DESC LIMIT 100'
+);
+$stmt->execute([$business['id'], $business['id']]);
+foreach ($stmt->fetchAll() as $row) {
+    $isInflow = $row['to_type'] === 'business' && (int) $row['to_business_id'] === $business['id'];
+    $otherLabel = $isInflow
+        ? transfer_endpoint_label($row['from_type'], $row['from_business_id'], $businessNames)
+        : transfer_endpoint_label($row['to_type'], $row['to_business_id'], $businessNames);
+    $history[] = [
+        'date'     => $row['date'],
+        'pillType' => $isInflow ? 'loan_received' : 'loan_given', // reuse blue/orange pill styling
+        'label'    => $isInflow ? 'Transfer in' : 'Transfer out',
+        'icon'     => $isInflow ? '🔁' : '🔁',
+        'category' => $isInflow ? ('From ' . $otherLabel) : ('To ' . $otherLabel),
+        'desc'     => $row['description'],
+        'amount'   => (float) $row['amount'],
+        'inflow'   => $isInflow,
+    ];
+}
+
+usort($history, fn($a, $b) => strcmp($b['date'], $a['date']));
+$history = array_slice($history, 0, 100);
 
 $pageTitle = h($business['name']) . ' - Soma Cashflow';
 require __DIR__ . '/../includes/header.php';
@@ -120,7 +179,7 @@ require __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<div class="stat-grid" style="margin-bottom:24px;">
+<div class="stat-grid" style="margin-bottom:24px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
     <div class="stat-card">
         <div class="stat-icon" style="background:var(--success-bg);">💰</div>
         <div class="stat-label">Income</div>
@@ -140,6 +199,13 @@ require __DIR__ . '/../includes/header.php';
         <div class="stat-icon" style="background:var(--accent-100);">🤝</div>
         <div class="stat-label">Loans given</div>
         <div class="stat-value" style="color:#b45309;">-<?= number_format($totals['loan_given'], 2) ?></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:var(--brand-100);">🔁</div>
+        <div class="stat-label">Net transfers</div>
+        <div class="stat-value" style="color: <?= ($transferIn - $transferOut) >= 0 ? 'var(--success-fg)' : 'var(--error-fg)' ?>;">
+            <?= ($transferIn - $transferOut) >= 0 ? '+' : '' ?><?= number_format($transferIn - $transferOut, 2) ?>
+        </div>
     </div>
 </div>
 
@@ -189,7 +255,7 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="card">
     <h2>Transaction history</h2>
-    <?php if (!$transactions): ?>
+    <?php if (!$history): ?>
         <div style="text-align:center; padding:24px 10px;">
             <div style="font-size:2rem; margin-bottom:6px;">💵</div>
             <p class="muted" style="margin:0;">No transactions yet &mdash; add your first one above.</p>
@@ -198,16 +264,14 @@ require __DIR__ . '/../includes/header.php';
         <div class="table-scroll">
         <table>
             <tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th style="text-align:right;">Amount</th></tr>
-            <?php foreach ($transactions as $t):
-                $isInflow = in_array($t['type'], ['income', 'loan_received'], true);
-            ?>
+            <?php foreach ($history as $h): ?>
             <tr>
-                <td><?= h($t['transaction_date']) ?></td>
-                <td><span class="pill <?= h($t['type']) ?>"><?= h($typeIcons[$t['type']] ?? '') ?> <?= h($typeLabels[$t['type']] ?? $t['type']) ?></span></td>
-                <td><?= h($t['category']) ?></td>
-                <td><?= h($t['description'] ?? '') ?></td>
-                <td style="text-align:right; color: <?= $isInflow ? 'var(--success-fg)' : 'var(--error-fg)' ?>; font-weight:700;">
-                    <?= $isInflow ? '+' : '-' ?><?= number_format((float) $t['amount'], 2) ?>
+                <td><?= h($h['date']) ?></td>
+                <td><span class="pill <?= h($h['pillType']) ?>"><?= h($h['icon']) ?> <?= h($h['label']) ?></span></td>
+                <td><?= h($h['category']) ?></td>
+                <td><?= h($h['desc'] ?? '') ?></td>
+                <td style="text-align:right; color: <?= $h['inflow'] ? 'var(--success-fg)' : 'var(--error-fg)' ?>; font-weight:700;">
+                    <?= $h['inflow'] ? '+' : '-' ?><?= number_format($h['amount'], 2) ?>
                 </td>
             </tr>
             <?php endforeach; ?>

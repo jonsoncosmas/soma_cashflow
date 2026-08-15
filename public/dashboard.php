@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../includes/session.php';
 require __DIR__ . '/../includes/helpers.php';
+require __DIR__ . '/../includes/ledger_helpers.php';
 require_login();
 $pdo = require __DIR__ . '/../config/database.php';
 $user = current_user();
@@ -50,42 +51,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $org) {
 }
 
 $businesses = [];
-$totalBalance = 0.0;
+$businessesTotal = 0.0;
 if ($org) {
     $stmt = $pdo->prepare(
-        "SELECT b.id, b.name, b.description, b.created_at,
-                COALESCE(SUM(CASE WHEN t.type IN ('income','loan_received') THEN t.amount
-                                  WHEN t.type IN ('expense','loan_given') THEN -t.amount
-                                  ELSE 0 END), 0) AS balance
-         FROM businesses b
-         LEFT JOIN transactions t ON t.business_id = b.id
-         WHERE b.organization_id = ?
-         GROUP BY b.id, b.name, b.description, b.created_at
-         ORDER BY b.created_at DESC"
+        'SELECT id, name, description, created_at FROM businesses WHERE organization_id = ? ORDER BY created_at DESC'
     );
     $stmt->execute([$org['id']]);
     $businesses = $stmt->fetchAll();
-    foreach ($businesses as $b) {
-        $totalBalance += (float) $b['balance'];
+    foreach ($businesses as &$b) {
+        $b['balance'] = get_business_balance($pdo, (int) $b['id']);
+        $businessesTotal += $b['balance'];
     }
+    unset($b);
 }
+
+$personalBalance = get_personal_balance($pdo, $user['id']);
+$netWorth = $personalBalance + $businessesTotal;
 
 $pageTitle = 'Dashboard - Soma Cashflow';
 require __DIR__ . '/../includes/header.php';
 ?>
 <div class="hero">
     <h1>Welcome back, <?= h(explode(' ', $user['name'])[0]) ?> 👋</h1>
-    <p>Here's the combined position across all your businesses in <?= h($org['name'] ?? 'your workspace') ?>.</p>
-    <div style="display:flex; gap:36px; flex-wrap:wrap; position:relative;">
+    <p>Here's your combined position across personal income and all businesses in <?= h($org['name'] ?? 'your workspace') ?>.</p>
+    <div style="display:flex; gap:36px; flex-wrap:wrap; position:relative; margin-bottom:20px;">
         <div>
-            <div style="font-size:0.8rem; color:rgba(255,255,255,0.88); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Combined balance</div>
-            <div style="font-size:2rem; font-weight:800; margin-top:2px;"><?= number_format($totalBalance, 2) ?></div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.88); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Personal</div>
+            <div style="font-size:1.6rem; font-weight:800; margin-top:2px;"><?= number_format($personalBalance, 2) ?></div>
         </div>
         <div>
-            <div style="font-size:0.8rem; color:rgba(255,255,255,0.88); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Businesses</div>
-            <div style="font-size:2rem; font-weight:800; margin-top:2px;"><?= count($businesses) ?></div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.88); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Businesses (<?= count($businesses) ?>)</div>
+            <div style="font-size:1.6rem; font-weight:800; margin-top:2px;"><?= number_format($businessesTotal, 2) ?></div>
+        </div>
+        <div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.88); font-weight:600; text-transform:uppercase; letter-spacing:0.03em;">Net worth</div>
+            <div style="font-size:1.6rem; font-weight:800; margin-top:2px;"><?= number_format($netWorth, 2) ?></div>
         </div>
     </div>
+    <a class="btn" href="/soma_cashflow/public/personal.php">👤 Personal ledger</a>
+    <a class="btn" href="/soma_cashflow/public/transfer.php" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.3); box-shadow:none;">🔁 Transfer funds</a>
 </div>
 
 <div class="card">
