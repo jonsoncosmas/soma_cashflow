@@ -49,6 +49,7 @@ function nav_active(string $path, string $needle): string
             --shadow-lifted: 0 8px 30px rgba(5,46,43,0.12);
         }
         * { box-sizing: border-box; }
+        html, body { max-width: 100%; overflow-x: hidden; }
         body {
             font-family: 'Inter', -apple-system, Segoe UI, Roboto, sans-serif;
             background: var(--bg);
@@ -161,7 +162,7 @@ function nav_active(string $path, string $needle): string
         input:focus, select:focus {
             outline: none; border-color: var(--brand-500); box-shadow: 0 0 0 3px var(--brand-100); background: #fff;
         }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
         .form-grid .full { grid-column: 1 / -1; }
         button, .btn {
             margin-top: 20px; background: linear-gradient(135deg, var(--brand-700), var(--brand-500));
@@ -193,17 +194,17 @@ function nav_active(string $path, string $needle): string
         a.link { color: var(--brand-600); font-weight: 600; text-decoration: none; }
         a.link:hover { text-decoration: underline; }
 
-        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        .stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
         .stat-card {
             background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
-            padding: 18px; box-shadow: var(--shadow-card);
+            padding: 18px; box-shadow: var(--shadow-card); min-width: 0;
         }
         .stat-card .stat-icon {
             width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
             font-size: 1rem; margin-bottom: 10px;
         }
         .stat-card .stat-label { font-size: 0.76rem; color: var(--ink-400); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
-        .stat-card .stat-value { font-size: 1.25rem; font-weight: 800; margin-top: 2px; letter-spacing: -0.01em; }
+        .stat-card .stat-value { font-size: 1.25rem; font-weight: 800; margin-top: 2px; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 
         .pill {
             display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px;
@@ -214,20 +215,20 @@ function nav_active(string $path, string $needle): string
         .pill.loan_received { background: var(--blue-100); color: #1d4ed8; }
         .pill.loan_given { background: var(--accent-100); color: #b45309; }
 
-        .biz-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .biz-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
         .biz-card {
             background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
             padding: 20px; box-shadow: var(--shadow-card); text-decoration: none; color: inherit;
-            transition: transform 0.12s ease, box-shadow 0.15s ease; display: block;
+            transition: transform 0.12s ease, box-shadow 0.15s ease; display: block; min-width: 0;
         }
         .biz-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lifted); }
         .biz-card .biz-icon {
             width: 40px; height: 40px; border-radius: 10px; background: var(--brand-100);
             display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 12px;
         }
-        .biz-card .biz-name { font-weight: 700; font-size: 1.02rem; color: var(--ink-900); }
-        .biz-card .biz-desc { color: var(--ink-600); font-size: 0.85rem; margin-top: 2px; min-height: 1.2em; }
-        .biz-card .biz-balance { margin-top: 14px; font-weight: 800; font-size: 1.15rem; }
+        .biz-card .biz-name { font-weight: 700; font-size: 1.02rem; color: var(--ink-900); overflow-wrap: anywhere; }
+        .biz-card .biz-desc { color: var(--ink-600); font-size: 0.85rem; margin-top: 2px; min-height: 1.2em; overflow-wrap: anywhere; }
+        .biz-card .biz-balance { margin-top: 14px; font-weight: 800; font-size: 1.15rem; overflow-wrap: anywhere; }
 
         .auth-wrap { max-width: 400px; margin: 60px auto 0; }
         .auth-wrap .brand-mark {
@@ -253,7 +254,7 @@ function nav_active(string $path, string $needle): string
         .hero .btn { background: #fff; color: var(--brand-700); position: relative; }
         .hero .btn:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.2); }
 
-        .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+        .feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 24px; }
         .feature-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; }
         .feature-card .f-icon { font-size: 1.3rem; margin-bottom: 8px; }
         .feature-card h3 { font-size: 0.94rem; margin: 0 0 4px; }
@@ -269,13 +270,13 @@ function nav_active(string $path, string $needle): string
             }
             .mobile-topbar { display: flex; }
             .app-main { margin-left: 0; padding: 22px 18px 50px; }
-            .stat-grid, .biz-grid, .feature-grid { grid-template-columns: 1fr 1fr; }
-            .form-grid { grid-template-columns: 1fr; }
+            .stat-grid, .biz-grid, .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .form-grid { grid-template-columns: minmax(0, 1fr); }
             .hero { padding: 30px 22px; }
             .sidebar-close-btn { display: block !important; }
         }
         @media (max-width: 520px) {
-            .stat-grid, .biz-grid, .feature-grid { grid-template-columns: 1fr; }
+            .stat-grid, .biz-grid, .feature-grid { grid-template-columns: minmax(0, 1fr); }
             .card { padding: 20px 16px; }
             .hero { padding: 24px 18px; }
             .hero h1 { font-size: 1.4rem; }
