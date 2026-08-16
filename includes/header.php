@@ -327,6 +327,9 @@ function nav_active(string $path, string $needle): string
             <a class="<?= nav_active((string) $currentPath, 'transfer.php') ?>" href="/soma_cashflow/public/transfer.php">
                 <span class="navicon">&#128257;</span> Transfers
             </a>
+            <a class="<?= nav_active((string) $currentPath, 'statements.php') ?>" href="/soma_cashflow/public/statements.php">
+                <span class="navicon">&#128202;</span> Statements
+            </a>
         </nav>
         <div class="user-card">
             <div class="avatar"><?= h(strtoupper(substr($user['name'], 0, 1))) ?></div>
