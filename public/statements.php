@@ -90,10 +90,14 @@ require __DIR__ . '/../includes/header.php';
     </form>
 </div>
 
-<div class="card" style="background: var(--brand-100); border-color: var(--brand-500);">
+<div class="card" style="background: var(--brand-100); border-color: var(--brand-500); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
     <p class="muted" style="margin:0; color:var(--brand-700); font-weight:600;">
         <?= h($scopeLabel) ?> &middot; <?= h($range['label']) ?>
     </p>
+    <a class="btn" style="margin-top:0;"
+       href="/soma_cashflow/public/statement_pdf.php?scope=<?= urlencode($scopeParam) ?>&preset=<?= urlencode($range['preset']) ?>&start=<?= urlencode($range['start']) ?>&end=<?= urlencode($range['end']) ?>">
+        &#128190; Download PDF
+    </a>
 </div>
 
 <?php if ($scopeType === 'all'): ?>

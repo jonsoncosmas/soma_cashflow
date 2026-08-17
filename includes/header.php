@@ -154,7 +154,7 @@ function nav_active(string $path, string $needle): string
             padding: 4px 10px; border-radius: 20px; margin-bottom: 10px;
         }
         label { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 0.85rem; color: var(--ink-600); }
-        input[type=text], input[type=email], input[type=password], select {
+        input[type=text], input[type=email], input[type=password], input[type=date], input[type=number], select {
             width: 100%; padding: 11px 13px; border: 1.5px solid var(--border); border-radius: var(--radius-md);
             font-size: 0.96rem; font-family: inherit; background: #fbfcfd;
             transition: border-color 0.15s ease, box-shadow 0.15s ease;
