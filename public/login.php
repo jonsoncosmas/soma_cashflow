@@ -25,7 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             login_user($user);
             flash_set('success', 'Welcome back, ' . $user['name'] . '.');
-            header('Location: /soma_cashflow/public/dashboard.php');
+            $inviteToken = (string) ($_POST['invite'] ?? '');
+            header('Location: ' . ($inviteToken !== '' ? '/soma_cashflow/public/accept_invite.php?token=' . urlencode($inviteToken) : '/soma_cashflow/public/dashboard.php'));
             exit;
         }
     }
@@ -51,6 +52,7 @@ require __DIR__ . '/../includes/header.php';
         <?php endforeach; ?>
         <form method="post" action="/soma_cashflow/public/login.php">
             <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+            <input type="hidden" name="invite" value="<?= h((string) ($_GET['invite'] ?? '')) ?>">
             <label for="email">Email</label>
             <input type="email" id="email" name="email" value="<?= h($_POST['email'] ?? '') ?>" required>
 

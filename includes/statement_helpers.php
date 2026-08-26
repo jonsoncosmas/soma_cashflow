@@ -247,42 +247,96 @@ function personal_cash_flow(PDO $pdo, int $userId, string $start, string $end): 
     ];
 }
 
-/** Combined income statement across personal + all businesses in the org (intercompany-style breakdown by entity). */
-function combined_income_statement(PDO $pdo, int $orgId, int $userId, string $start, string $end): array
+/**
+ * An "entity" is ['type'=>'personal'] or ['type'=>'business','id'=>X,'name'=>Y].
+ * These helpers work over any chosen subset of entities, not just the full org.
+ */
+
+function entity_income_statement(PDO $pdo, array $entity, int $userId, string $start, string $end): array
+{
+    return $entity['type'] === 'personal'
+        ? personal_income_statement($pdo, $userId, $start, $end)
+        : business_income_statement($pdo, (int) $entity['id'], $start, $end);
+}
+
+function entity_balance_as_of(PDO $pdo, array $entity, int $userId, string $asOfDate): float
+{
+    return $entity['type'] === 'personal'
+        ? get_personal_balance_as_of($pdo, $userId, $asOfDate)
+        : get_business_balance_as_of($pdo, (int) $entity['id'], $asOfDate);
+}
+
+function entity_label(array $entity): string
+{
+    return $entity['type'] === 'personal' ? 'Personal' : $entity['name'];
+}
+
+/** Income statement broken down by entity, for any chosen subset of entities. */
+function combined_income_statement(PDO $pdo, array $entities, int $userId, string $start, string $end): array
 {
     $rows = [];
-    $p = personal_income_statement($pdo, $userId, $start, $end);
-    $rows[] = ['entity' => 'Personal', 'income' => $p['income_total'], 'expense' => $p['expense_total'], 'net' => $p['net']];
-
-    $stmt = $pdo->prepare('SELECT id, name FROM businesses WHERE organization_id = ? ORDER BY name');
-    $stmt->execute([$orgId]);
-    foreach ($stmt->fetchAll() as $b) {
-        $bi = business_income_statement($pdo, (int) $b['id'], $start, $end);
-        $rows[] = ['entity' => $b['name'], 'income' => $bi['income_total'], 'expense' => $bi['expense_total'], 'net' => $bi['net']];
+    foreach ($entities as $entity) {
+        $s = entity_income_statement($pdo, $entity, $userId, $start, $end);
+        $rows[] = ['entity' => entity_label($entity), 'income' => $s['income_total'], 'expense' => $s['expense_total'], 'net' => $s['net']];
     }
-
     $totalIncome = array_sum(array_column($rows, 'income'));
     $totalExpense = array_sum(array_column($rows, 'expense'));
-
     return ['rows' => $rows, 'total_income' => $totalIncome, 'total_expense' => $totalExpense, 'total_net' => $totalIncome - $totalExpense];
 }
 
-/** Combined net worth (personal + all businesses) as of a given date. */
-function combined_net_worth_as_of(PDO $pdo, int $orgId, int $userId, string $asOfDate): float
+/** Combined cash balance across the chosen subset of entities as of a given date. */
+function combined_net_worth_as_of(PDO $pdo, array $entities, int $userId, string $asOfDate): float
 {
-    $total = get_personal_balance_as_of($pdo, $userId, $asOfDate);
-    $stmt = $pdo->prepare('SELECT id FROM businesses WHERE organization_id = ?');
-    $stmt->execute([$orgId]);
-    foreach ($stmt->fetchAll() as $b) {
-        $total += get_business_balance_as_of($pdo, (int) $b['id'], $asOfDate);
+    $total = 0.0;
+    foreach ($entities as $entity) {
+        $total += entity_balance_as_of($pdo, $entity, $userId, $asOfDate);
     }
     return $total;
 }
 
-/** Total volume of internal transfers within the org for the period (informational/audit figure). */
-function combined_internal_transfer_volume(PDO $pdo, int $orgId, string $start, string $end): float
+/**
+ * Total volume of transfers touching the chosen entities in the period. When
+ * every entity in the org is included, this is purely internal and nets to
+ * zero in aggregate; for a partial subset it may include real flow to/from
+ * entities outside the selection, so the caller should label accordingly.
+ * Each transfer is counted once even if both its legs are within the
+ * selected set.
+ */
+function combined_transfer_volume(PDO $pdo, array $entities, int $userId, string $start, string $end): float
 {
-    $stmt = $pdo->prepare('SELECT COALESCE(SUM(amount),0) AS t FROM fund_transfers WHERE organization_id = ? AND transfer_date BETWEEN ? AND ?');
-    $stmt->execute([$orgId, $start, $end]);
+    $personalIncluded = false;
+    $businessIds = [];
+    foreach ($entities as $e) {
+        if ($e['type'] === 'personal') {
+            $personalIncluded = true;
+        } else {
+            $businessIds[] = (int) $e['id'];
+        }
+    }
+
+    $conditions = [];
+    $params = [];
+
+    if ($personalIncluded) {
+        $conditions[] = "(from_type='personal' AND user_id=?) OR (to_type='personal' AND user_id=?)";
+        $params[] = $userId;
+        $params[] = $userId;
+    }
+    if ($businessIds) {
+        $placeholders = implode(',', array_fill(0, count($businessIds), '?'));
+        $conditions[] = "(from_type='business' AND from_business_id IN ($placeholders)) OR (to_type='business' AND to_business_id IN ($placeholders))";
+        foreach ($businessIds as $id) { $params[] = $id; }
+        foreach ($businessIds as $id) { $params[] = $id; }
+    }
+    if (!$conditions) {
+        return 0.0;
+    }
+
+    $where = '(' . implode(') OR (', $conditions) . ')';
+    $params[] = $start;
+    $params[] = $end;
+
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount),0) AS t FROM fund_transfers WHERE ({$where}) AND transfer_date BETWEEN ? AND ?");
+    $stmt->execute($params);
     return (float) $stmt->fetch()['t'];
 }

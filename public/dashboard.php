@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/../includes/session.php';
 require __DIR__ . '/../includes/helpers.php';
 require __DIR__ . '/../includes/ledger_helpers.php';
+require __DIR__ . '/../includes/access_control.php';
 require_login();
 $pdo = require __DIR__ . '/../config/database.php';
 $user = current_user();
@@ -68,6 +69,12 @@ if ($org) {
 $personalBalance = get_personal_balance($pdo, $user['id']);
 $netWorth = $personalBalance + $businessesTotal;
 
+$sharedBusinesses = get_shared_businesses($pdo, $user['id']);
+foreach ($sharedBusinesses as &$sb) {
+    $sb['balance'] = get_business_balance($pdo, (int) $sb['id']);
+}
+unset($sb);
+
 $pageTitle = 'Dashboard - Soma Cashflow';
 require __DIR__ . '/../includes/header.php';
 ?>
@@ -90,6 +97,7 @@ require __DIR__ . '/../includes/header.php';
     </div>
     <a class="btn" href="/soma_cashflow/public/personal.php">👤 Personal ledger</a>
     <a class="btn" href="/soma_cashflow/public/transfer.php" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.3); box-shadow:none;">🔁 Transfer funds</a>
+    <a class="btn" href="/soma_cashflow/public/team.php" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.3); box-shadow:none;">🤝 Team</a>
 </div>
 
 <div class="card">
@@ -132,5 +140,21 @@ require __DIR__ . '/../includes/header.php';
         </a>
         <?php endforeach; ?>
     </div>
+<?php endif; ?>
+
+<?php if ($sharedBusinesses): ?>
+<h2 style="font-size:1.05rem; margin: 26px 2px 12px;">Shared with you</h2>
+<div class="biz-grid">
+    <?php foreach ($sharedBusinesses as $sb): $bal = (float) $sb['balance']; ?>
+    <a class="biz-card" href="/soma_cashflow/public/business.php?id=<?= (int) $sb['id'] ?>">
+        <div class="biz-icon">🤝</div>
+        <div class="biz-name"><?= h($sb['name']) ?></div>
+        <div class="biz-desc"><?= h($sb['org_name']) ?> &middot; <?= h(ucfirst($sb['role'])) ?></div>
+        <div class="biz-balance" style="color: <?= $bal >= 0 ? 'var(--success-fg)' : 'var(--error-fg)' ?>;">
+            <?= number_format($bal, 2) ?>
+        </div>
+    </a>
+    <?php endforeach; ?>
+</div>
 <?php endif; ?>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

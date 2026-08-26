@@ -53,7 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             login_user(['id' => $userId, 'name' => $name, 'email' => $email]);
             flash_set('success', 'Welcome, ' . $name . '! Your workspace has been created.');
-            header('Location: /soma_cashflow/public/dashboard.php');
+            $inviteToken = (string) ($_POST['invite'] ?? '');
+            header('Location: ' . ($inviteToken !== '' ? '/soma_cashflow/public/accept_invite.php?token=' . urlencode($inviteToken) : '/soma_cashflow/public/dashboard.php'));
             exit;
         } catch (Throwable $e) {
             $pdo->rollBack();
@@ -80,8 +81,9 @@ require __DIR__ . '/../includes/header.php';
         <?php foreach ($errors as $e): ?>
             <div class="flash error"><?= h($e) ?></div>
         <?php endforeach; ?>
-        <form method="post" action="/soma_cashflow/public/register.php">
+        <form method="post" action="/soma_cashflow/public/register.php?invite=<?= h((string) ($_GET['invite'] ?? '')) ?>">
             <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+            <input type="hidden" name="invite" value="<?= h((string) ($_GET['invite'] ?? '')) ?>">
             <label for="name">Full name</label>
             <input type="text" id="name" name="name" value="<?= h($_POST['name'] ?? '') ?>" required>
 

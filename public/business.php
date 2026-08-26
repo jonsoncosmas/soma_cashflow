@@ -3,20 +3,22 @@ declare(strict_types=1);
 
 require __DIR__ . '/../includes/session.php';
 require __DIR__ . '/../includes/helpers.php';
-require __DIR__ . '/../includes/business_access.php';
+require __DIR__ . '/../includes/access_control.php';
 require __DIR__ . '/../includes/ledger_helpers.php';
 require_login();
 $pdo = require __DIR__ . '/../config/database.php';
 $user = current_user();
 
 $businessId = (int) ($_GET['id'] ?? 0);
-$business = get_owned_business($pdo, $businessId, $user['id']);
+$access = get_business_access($pdo, $businessId, $user['id']);
 
-if (!$business) {
+if (!$access) {
     flash_set('error', 'Business not found or you do not have access to it.');
     header('Location: /soma_cashflow/public/dashboard.php');
     exit;
 }
+$business = $access['business'];
+$canEdit = role_can_edit($access['role']);
 
 $errors = [];
 
@@ -39,6 +41,11 @@ $categorySuggestions = [
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!$canEdit) {
+        flash_set('error', 'You have view-only access to this business.');
+        header('Location: /soma_cashflow/public/business.php?id=' . $business['id']);
+        exit;
+    }
     if (!csrf_check($_POST['csrf_token'] ?? null)) {
         $errors[] = 'Invalid form submission, please try again.';
     }
@@ -126,13 +133,10 @@ foreach ($stmt->fetchAll() as $row) {
     ];
 }
 
-// Business name lookup for transfer labels
-$stmt = $pdo->prepare(
-    'SELECT b.id, b.name FROM businesses b
-     INNER JOIN organizations o ON o.id = b.organization_id
-     WHERE o.owner_user_id = ?'
-);
-$stmt->execute([$user['id']]);
+// Business name lookup for transfer labels - scoped to this business's own
+// organization, not the viewer's ownership (a shared member may not own it).
+$stmt = $pdo->prepare('SELECT id, name FROM businesses WHERE organization_id = ?');
+$stmt->execute([$business['organization_id']]);
 $businessNames = array_column($stmt->fetchAll(), 'name', 'id');
 
 $stmt = $pdo->prepare(
@@ -170,6 +174,11 @@ require __DIR__ . '/../includes/header.php';
 <div class="hero">
     <span class="eyebrow" style="background:rgba(255,255,255,0.16); color:#fff;">Business</span>
     <h1><?= h($business['name']) ?></h1>
+    <?php if ($access['role'] !== 'owner'): ?>
+        <p style="font-size:0.85rem; color:rgba(255,255,255,0.85); margin:-4px 0 6px;">
+            Shared from <?= h($access['org_name']) ?> &middot; your access: <strong><?= h(ucfirst($access['role'])) ?></strong>
+        </p>
+    <?php endif; ?>
     <?php if ($business['description']): ?>
         <p><?= h($business['description']) ?></p>
     <?php endif; ?>
@@ -209,6 +218,7 @@ require __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<?php if ($canEdit): ?>
 <div class="card">
     <h2>Add a transaction</h2>
     <?php foreach ($errors as $e): ?>
@@ -252,6 +262,11 @@ require __DIR__ . '/../includes/header.php';
         <button type="submit">+ Add transaction</button>
     </form>
 </div>
+<?php else: ?>
+<div class="card" style="background:var(--bg); border-style:dashed; text-align:center;">
+    <p class="muted" style="margin:0;">👁️ You have view-only access to this business.</p>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <h2>Transaction history</h2>
