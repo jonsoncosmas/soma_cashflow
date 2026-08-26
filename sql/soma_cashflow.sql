@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Aug 15, 2026 at 07:58 PM
+-- Generation Time: Aug 26, 2026 at 07:18 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -61,7 +61,7 @@ CREATE TABLE `fund_transfers` (
   `description` text DEFAULT NULL,
   `transfer_date` date NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -82,7 +82,35 @@ CREATE TABLE `organizations` (
 --
 
 INSERT INTO `organizations` (`id`, `name`, `owner_user_id`, `created_at`, `updated_at`) VALUES
-(1, 'Johnson Antipas Berege\'s Workspace', 1, '2026-08-11 12:36:34', '2026-08-11 12:36:34');
+(1, 'Johnson Antipas Berege\'s Workspace', 1, '2026-08-11 12:36:34', '2026-08-11 12:36:34'),
+(2, 'Somaspace\'s Workspace', 2, '2026-08-26 17:16:07', '2026-08-26 17:16:07');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `organization_members`
+--
+
+CREATE TABLE `organization_members` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `organization_id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED DEFAULT NULL,
+  `invited_email` varchar(190) NOT NULL,
+  `role` enum('admin','viewer') NOT NULL,
+  `business_id` int(10) UNSIGNED DEFAULT NULL,
+  `invited_by` int(10) UNSIGNED NOT NULL,
+  `invite_token` varchar(64) DEFAULT NULL,
+  `status` enum('pending','active') NOT NULL DEFAULT 'pending',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `accepted_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `organization_members`
+--
+
+INSERT INTO `organization_members` (`id`, `organization_id`, `user_id`, `invited_email`, `role`, `business_id`, `invited_by`, `invite_token`, `status`, `created_at`, `accepted_at`) VALUES
+(2, 1, 2, 'somaspace26@gmail.com', 'viewer', NULL, 1, NULL, 'active', '2026-08-26 17:17:15', '2026-08-26 17:17:15');
 
 -- --------------------------------------------------------
 
@@ -100,7 +128,7 @@ CREATE TABLE `personal_transactions` (
   `transaction_date` date NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -119,7 +147,7 @@ CREATE TABLE `transactions` (
   `transaction_date` date NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `transactions`
@@ -151,7 +179,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `created_at`, `updated_at`) VALUES
-(1, 'Johnson Antipas Berege', 'jonsoncosmas@gmail.com', '$2y$10$USjZovL5Y96PWj7lw9SF3OwfB.ALjwbdl2G3bno5vVrt59XlM8jW.', '2026-08-11 12:36:34', '2026-08-11 12:36:34');
+(1, 'Johnson Antipas Berege', 'jonsoncosmas@gmail.com', '$2y$10$USjZovL5Y96PWj7lw9SF3OwfB.ALjwbdl2G3bno5vVrt59XlM8jW.', '2026-08-11 12:36:34', '2026-08-11 12:36:34'),
+(2, 'Somaspace', 'somaspace26@gmail.com', '$2y$10$1spsmEQSxlXcyxOERe0oD.QrSXT1EoKtm6rpKBhKIQ5k9nuTQVBI6', '2026-08-26 17:16:07', '2026-08-26 17:16:07');
 
 --
 -- Indexes for dumped tables
@@ -182,6 +211,18 @@ ALTER TABLE `fund_transfers`
 ALTER TABLE `organizations`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_org_owner` (`owner_user_id`);
+
+--
+-- Indexes for table `organization_members`
+--
+ALTER TABLE `organization_members`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_member_org_email_business` (`organization_id`,`invited_email`,`business_id`),
+  ADD KEY `fk_member_business` (`business_id`),
+  ADD KEY `fk_member_invited_by` (`invited_by`),
+  ADD KEY `idx_member_org` (`organization_id`),
+  ADD KEY `idx_member_user` (`user_id`),
+  ADD KEY `idx_member_token` (`invite_token`);
 
 --
 -- Indexes for table `personal_transactions`
@@ -227,7 +268,13 @@ ALTER TABLE `fund_transfers`
 -- AUTO_INCREMENT for table `organizations`
 --
 ALTER TABLE `organizations`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `organization_members`
+--
+ALTER TABLE `organization_members`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `personal_transactions`
@@ -239,13 +286,13 @@ ALTER TABLE `personal_transactions`
 -- AUTO_INCREMENT for table `transactions`
 --
 ALTER TABLE `transactions`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- Constraints for dumped tables
@@ -271,6 +318,15 @@ ALTER TABLE `fund_transfers`
 --
 ALTER TABLE `organizations`
   ADD CONSTRAINT `fk_org_owner` FOREIGN KEY (`owner_user_id`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `organization_members`
+--
+ALTER TABLE `organization_members`
+  ADD CONSTRAINT `fk_member_business` FOREIGN KEY (`business_id`) REFERENCES `businesses` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_member_invited_by` FOREIGN KEY (`invited_by`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `fk_member_org` FOREIGN KEY (`organization_id`) REFERENCES `organizations` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_member_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `personal_transactions`
