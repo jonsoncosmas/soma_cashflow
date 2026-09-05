@@ -179,13 +179,44 @@ require __DIR__ . '/../includes/header.php';
                        onfocus="this.type='date'" onblur="if(!this.value)this.type='text'">
             </div>
             <div class="full">
-                <label for="description">Description (optional)</label>
+                <label for="description">Description (optional, but helps AI suggest a category)</label>
                 <input type="text" id="description" name="description" value="<?= h($_POST['description'] ?? '') ?>" placeholder="e.g. August salary">
+                <button type="button" id="ai-suggest-btn" onclick="somaAiSuggest()" style="margin-top:8px; background:var(--brand-100); color:var(--brand-700); box-shadow:none; padding:8px 14px; font-size:0.85rem;">✨ Suggest with AI</button>
+                <span id="ai-suggest-status" class="muted" style="margin-left:8px; font-size:0.82rem;"></span>
             </div>
         </div>
         <button type="submit">+ Add transaction</button>
     </form>
 </div>
+<script>
+async function somaAiSuggest() {
+    const desc = document.getElementById('description').value.trim();
+    const status = document.getElementById('ai-suggest-status');
+    if (!desc) { status.textContent = 'Enter a description first.'; return; }
+    status.textContent = 'Thinking…';
+    try {
+        const res = await fetch('/soma_cashflow/public/ai_suggest.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                description: desc,
+                amount: document.getElementById('amount').value,
+                context: 'personal'
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('type').value = data.type;
+            document.getElementById('category').value = data.category;
+            status.textContent = 'Suggested by ' + data.provider + ' (' + Math.round(data.confidence * 100) + '% confidence) — review before saving.';
+        } else {
+            status.textContent = 'Could not get a suggestion — pick manually.';
+        }
+    } catch (e) {
+        status.textContent = 'Could not reach AI service — pick manually.';
+    }
+}
+</script>
 
 <div class="card">
     <h2>History</h2>
