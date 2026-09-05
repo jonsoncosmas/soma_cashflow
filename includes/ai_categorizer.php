@@ -71,13 +71,17 @@ function ai_parse_json_response(string $raw, array $allowedTypes): ?array
 }
 
 /**
- * Calls OpenAI's chat completions endpoint. Returns the raw assistant text
- * on success, or null on any failure (network, timeout, non-200, malformed).
+ * Calls OpenAI's chat completions endpoint. Returns
+ * ['content'=>?string,'input_tokens'=>?int,'output_tokens'=>?int] - content
+ * is null on any failure (network, timeout, non-200, malformed), but token
+ * counts are still returned if the API responded with usage data even when
+ * the content itself couldn't be used.
  */
-function ai_call_openai(string $apiKey, string $prompt): ?string
+function ai_call_openai(string $apiKey, string $prompt): array
 {
+    $empty = ['content' => null, 'input_tokens' => null, 'output_tokens' => null];
     if ($apiKey === '') {
-        return null;
+        return $empty;
     }
 
     $ch = curl_init('https://api.openai.com/v1/chat/completions');
@@ -101,21 +105,31 @@ function ai_call_openai(string $apiKey, string $prompt): ?string
     $curlError = curl_error($ch);
     curl_close($ch);
 
-    if ($response === false || $curlError !== '' || $status !== 200) {
-        return null;
+    if ($response === false || $curlError !== '') {
+        return $empty;
     }
 
     $decoded = json_decode($response, true);
-    return $decoded['choices'][0]['message']['content'] ?? null;
+    $usage = [
+        'input_tokens' => isset($decoded['usage']['prompt_tokens']) ? (int) $decoded['usage']['prompt_tokens'] : null,
+        'output_tokens' => isset($decoded['usage']['completion_tokens']) ? (int) $decoded['usage']['completion_tokens'] : null,
+    ];
+
+    if ($status !== 200) {
+        return ['content' => null] + $usage;
+    }
+
+    return ['content' => $decoded['choices'][0]['message']['content'] ?? null] + $usage;
 }
 
 /**
  * Calls Anthropic's messages endpoint. Same contract as ai_call_openai().
  */
-function ai_call_anthropic(string $apiKey, string $prompt): ?string
+function ai_call_anthropic(string $apiKey, string $prompt): array
 {
+    $empty = ['content' => null, 'input_tokens' => null, 'output_tokens' => null];
     if ($apiKey === '') {
-        return null;
+        return $empty;
     }
 
     $ch = curl_init('https://api.anthropic.com/v1/messages');
@@ -139,12 +153,21 @@ function ai_call_anthropic(string $apiKey, string $prompt): ?string
     $curlError = curl_error($ch);
     curl_close($ch);
 
-    if ($response === false || $curlError !== '' || $status !== 200) {
-        return null;
+    if ($response === false || $curlError !== '') {
+        return $empty;
     }
 
     $decoded = json_decode($response, true);
-    return $decoded['content'][0]['text'] ?? null;
+    $usage = [
+        'input_tokens' => isset($decoded['usage']['input_tokens']) ? (int) $decoded['usage']['input_tokens'] : null,
+        'output_tokens' => isset($decoded['usage']['output_tokens']) ? (int) $decoded['usage']['output_tokens'] : null,
+    ];
+
+    if ($status !== 200) {
+        return ['content' => null] + $usage;
+    }
+
+    return ['content' => $decoded['content'][0]['text'] ?? null] + $usage;
 }
 
 /**
@@ -173,10 +196,16 @@ function ai_categorize(
     $result = null;
     $provider = null;
     $errorMessage = null;
+    $openaiInputTokens = null;
+    $openaiOutputTokens = null;
+    $anthropicInputTokens = null;
+    $anthropicOutputTokens = null;
 
-    $raw = ai_call_openai($openaiKey, $prompt);
-    if ($raw !== null) {
-        $parsed = ai_parse_json_response($raw, $allowedTypes);
+    $openaiResponse = ai_call_openai($openaiKey, $prompt);
+    $openaiInputTokens = $openaiResponse['input_tokens'];
+    $openaiOutputTokens = $openaiResponse['output_tokens'];
+    if ($openaiResponse['content'] !== null) {
+        $parsed = ai_parse_json_response($openaiResponse['content'], $allowedTypes);
         if ($parsed !== null) {
             $result = $parsed;
             $provider = 'openai';
@@ -184,9 +213,11 @@ function ai_categorize(
     }
 
     if ($result === null) {
-        $raw = ai_call_anthropic($anthropicKey, $prompt);
-        if ($raw !== null) {
-            $parsed = ai_parse_json_response($raw, $allowedTypes);
+        $anthropicResponse = ai_call_anthropic($anthropicKey, $prompt);
+        $anthropicInputTokens = $anthropicResponse['input_tokens'];
+        $anthropicOutputTokens = $anthropicResponse['output_tokens'];
+        if ($anthropicResponse['content'] !== null) {
+            $parsed = ai_parse_json_response($anthropicResponse['content'], $allowedTypes);
             if ($parsed !== null) {
                 $result = $parsed;
                 $provider = 'anthropic';
@@ -202,13 +233,16 @@ function ai_categorize(
 
     $stmt = $pdo->prepare(
         'INSERT INTO ai_suggestions_log
-            (user_id, business_id, context, description, amount, suggested_type, suggested_category, confidence, provider, success, error_message)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            (user_id, business_id, context, description, amount, suggested_type, suggested_category, confidence,
+             provider, openai_input_tokens, openai_output_tokens, anthropic_input_tokens, anthropic_output_tokens,
+             success, error_message)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $userId, $businessId, $context, $description, $amount,
         $result['type'] ?? null, $result['category'] ?? null, $result['confidence'] ?? null,
-        $provider, $result !== null ? 1 : 0, $errorMessage,
+        $provider, $openaiInputTokens, $openaiOutputTokens, $anthropicInputTokens, $anthropicOutputTokens,
+        $result !== null ? 1 : 0, $errorMessage,
     ]);
 
     return [
