@@ -1,0 +1,3 @@
+# Block all direct access - photos must be served through public/photo.php,
+# which enforces business access control before streaming any file.
+Require all denied

@@ -1,6 +1,10 @@
 # Local config with real DB credentials
 config/config.php
 
+# Uploaded business photos (user data - never committed)
+storage/business_photos/*
+!storage/business_photos/.gitkeep
+
 # OS / editor junk
 .DS_Store
 Thumbs.db

@@ -169,7 +169,11 @@ $history = array_slice($history, 0, 100);
 $pageTitle = h($business['name']) . ' - Soma Cashflow';
 require __DIR__ . '/../includes/header.php';
 ?>
-<p class="muted" style="margin-bottom:14px;"><a class="link" href="/soma_cashflow/public/dashboard.php">&larr; Dashboard</a></p>
+<p class="muted" style="margin-bottom:14px;">
+    <a class="link" href="/soma_cashflow/public/dashboard.php">&larr; Dashboard</a>
+    &nbsp;&middot;&nbsp;
+    <a class="link" href="/soma_cashflow/public/gallery.php?business_id=<?= (int) $business['id'] ?>">📷 Photo gallery</a>
+</p>
 
 <div class="hero">
     <span class="eyebrow" style="background:rgba(255,255,255,0.16); color:#fff;">Business</span>
