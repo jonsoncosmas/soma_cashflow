@@ -145,10 +145,11 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="card">
     <h2>Add a personal transaction</h2>
+    <span id="offline-sync-status" class="muted" style="display:block; font-size:0.82rem; margin-bottom:8px;"></span>
     <?php foreach ($errors as $e): ?>
         <div class="flash error"><?= h($e) ?></div>
     <?php endforeach; ?>
-    <form method="post" action="/soma_cashflow/public/personal.php">
+    <form method="post" action="/soma_cashflow/public/personal.php" id="transaction-form">
         <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
         <div class="form-grid">
             <div>
@@ -216,6 +217,15 @@ async function somaAiSuggest() {
         status.textContent = 'Could not reach AI service — pick manually.';
     }
 }
+</script>
+<script src="/soma_cashflow/public/js/offline_sync.js"></script>
+<script>
+    SomaOfflineSync.wireOfflineForm(
+        document.getElementById('transaction-form'),
+        'personal',
+        {},
+        document.getElementById('offline-sync-status')
+    );
 </script>
 
 <div class="card">

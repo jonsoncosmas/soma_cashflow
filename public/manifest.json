@@ -1,0 +1,37 @@
+{
+    "name": "Soma Cashflow",
+    "short_name": "Cashflow",
+    "description": "Track income, expenses, and cash flow across your businesses.",
+    "start_url": "/soma_cashflow/public/dashboard.php",
+    "scope": "/soma_cashflow/public/",
+    "display": "standalone",
+    "background_color": "#f4f6f8",
+    "theme_color": "#0d5c53",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/soma_cashflow/public/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/soma_cashflow/public/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/soma_cashflow/public/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/soma_cashflow/public/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
