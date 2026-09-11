@@ -295,6 +295,23 @@ function nav_active(string $path, string $needle): string
                     .catch(() => { /* offline support just won't be available - app still works normally */ });
             });
         }
+
+        // Logging out genuinely requires the server (it destroys the session
+        // there), so it can't work offline - but showing the full jarring
+        // "you're offline" fallback page for a logout click is bad UX.
+        // Intercept it here and show a small inline message instead.
+        document.addEventListener('DOMContentLoaded', () => {
+            const logoutLink = document.getElementById('logout-link');
+            const offlineMsg = document.getElementById('logout-offline-msg');
+            if (logoutLink) {
+                logoutLink.addEventListener('click', (e) => {
+                    if (!navigator.onLine) {
+                        e.preventDefault();
+                        if (offlineMsg) offlineMsg.style.display = 'block';
+                    }
+                });
+            }
+        });
     </script>
 </head>
 <body>
@@ -353,7 +370,8 @@ function nav_active(string $path, string $needle): string
             <div class="avatar"><?= h(strtoupper(substr($user['name'], 0, 1))) ?></div>
             <div style="flex:1; min-width:0;">
                 <div class="u-name"><?= h($user['name']) ?></div>
-                <a class="u-logout" href="/soma_cashflow/public/logout.php">Log out</a>
+                <a id="logout-link" class="u-logout" href="/soma_cashflow/public/logout.php">Log out</a>
+                <div id="logout-offline-msg" style="display:none; font-size:0.72rem; color:#fbbf24; margin-top:3px;">You're offline — can't log out until you're back online.</div>
             </div>
         </div>
     </aside>
