@@ -209,7 +209,8 @@ async function somaAiSuggest() {
         if (data.success) {
             document.getElementById('type').value = data.type;
             document.getElementById('category').value = data.category;
-            status.textContent = 'Suggested by ' + data.provider + ' (' + Math.round(data.confidence * 100) + '% confidence) — review before saving.';
+            var providerLabel = data.provider === 'openrouter' ? 'openrouter (' + data.model + ')' : data.provider;
+            status.textContent = 'Suggested by ' + providerLabel + ' (' + Math.round(data.confidence * 100) + '% confidence) — review before saving.';
         } else {
             status.textContent = 'Could not get a suggestion — pick manually.';
         }

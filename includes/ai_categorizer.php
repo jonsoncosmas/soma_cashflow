@@ -2,11 +2,12 @@
 declare(strict_types=1);
 
 /**
- * Soma Cashflow - AI transaction categorizer (Phase 6)
+ * Soma Cashflow - AI transaction categorizer (Phase 6 + OpenRouter)
  *
- * Tries OpenAI (ChatGPT) first; if that fails or isn't configured, falls
- * back to Claude. Every attempt is logged to ai_suggestions_log for later
- * accuracy auditing, including which provider actually answered.
+ * Tries your configured OpenRouter free models first (in the order you list
+ * them), then OpenAI, then falls back to Claude. Every attempt is logged to
+ * ai_suggestions_log for later accuracy/cost auditing, including which
+ * provider - and for OpenRouter, which specific model - actually answered.
  */
 
 const AI_HTTP_TIMEOUT_SECONDS = 6;
@@ -171,10 +172,68 @@ function ai_call_anthropic(string $apiKey, string $prompt): array
 }
 
 /**
- * Orchestrates: try OpenAI, fall back to Claude, log the outcome either way.
+ * Calls OpenRouter's chat completions endpoint (OpenAI-compatible format)
+ * for a specific model. Same contract as ai_call_openai(). The model to
+ * use is passed in rather than hardcoded, since which OpenRouter models are
+ * free (and their exact IDs) changes frequently - see config.sample.php.
+ */
+function ai_call_openrouter(string $apiKey, string $model, string $prompt): array
+{
+    $empty = ['content' => null, 'input_tokens' => null, 'output_tokens' => null];
+    if ($apiKey === '' || $model === '') {
+        return $empty;
+    }
+
+    $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_TIMEOUT => AI_HTTP_TIMEOUT_SECONDS,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+            'HTTP-Referer: https://soma-cashflow.local',
+            'X-Title: Soma Cashflow',
+        ],
+        CURLOPT_POSTFIELDS => json_encode([
+            'model' => $model,
+            'messages' => [['role' => 'user', 'content' => $prompt]],
+            'temperature' => 0,
+            'max_tokens' => 200,
+        ]),
+    ]);
+    $response = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false || $curlError !== '') {
+        return $empty;
+    }
+
+    $decoded = json_decode($response, true);
+    $usage = [
+        'input_tokens' => isset($decoded['usage']['prompt_tokens']) ? (int) $decoded['usage']['prompt_tokens'] : null,
+        'output_tokens' => isset($decoded['usage']['completion_tokens']) ? (int) $decoded['usage']['completion_tokens'] : null,
+    ];
+
+    if ($status !== 200) {
+        return ['content' => null] + $usage;
+    }
+
+    return ['content' => $decoded['choices'][0]['message']['content'] ?? null] + $usage;
+}
+
+/**
+ * Orchestrates: try OpenRouter's configured free models in order (your
+ * choice, cheapest-first by design), then OpenAI, then Claude. Every
+ * attempt is logged to ai_suggestions_log for later accuracy/cost auditing,
+ * including which provider (and for OpenRouter, which specific model)
+ * actually answered.
  *
- * $config is the app config array (must contain $config['ai']['openai_api_key']
- * and $config['ai']['anthropic_api_key']).
+ * $config['ai'] may contain: openai_api_key, anthropic_api_key,
+ * openrouter_api_key, and openrouter_models (an ordered array of model IDs
+ * to try - the first one that returns a usable response wins).
  *
  * Returns ['type'=>?,'category'=>?,'confidence'=>?,'provider'=>?,'success'=>bool].
  */
@@ -192,6 +251,8 @@ function ai_categorize(
     $prompt = ai_build_prompt($description, $amount, $allowedTypes, $categorySuggestions);
     $openaiKey = $config['ai']['openai_api_key'] ?? '';
     $anthropicKey = $config['ai']['anthropic_api_key'] ?? '';
+    $openrouterKey = $config['ai']['openrouter_api_key'] ?? '';
+    $openrouterModels = $config['ai']['openrouter_models'] ?? [];
 
     $result = null;
     $provider = null;
@@ -200,18 +261,47 @@ function ai_categorize(
     $openaiOutputTokens = null;
     $anthropicInputTokens = null;
     $anthropicOutputTokens = null;
+    $openrouterInputTokens = null;
+    $openrouterOutputTokens = null;
+    $openrouterModelUsed = null;
 
-    $openaiResponse = ai_call_openai($openaiKey, $prompt);
-    $openaiInputTokens = $openaiResponse['input_tokens'];
-    $openaiOutputTokens = $openaiResponse['output_tokens'];
-    if ($openaiResponse['content'] !== null) {
-        $parsed = ai_parse_json_response($openaiResponse['content'], $allowedTypes);
-        if ($parsed !== null) {
-            $result = $parsed;
-            $provider = 'openai';
+    // 1. OpenRouter: try each configured model in order until one works.
+    if ($openrouterKey !== '' && $openrouterModels) {
+        foreach ($openrouterModels as $model) {
+            $response = ai_call_openrouter($openrouterKey, $model, $prompt);
+            if ($response['input_tokens'] !== null) {
+                $openrouterInputTokens = ($openrouterInputTokens ?? 0) + $response['input_tokens'];
+            }
+            if ($response['output_tokens'] !== null) {
+                $openrouterOutputTokens = ($openrouterOutputTokens ?? 0) + $response['output_tokens'];
+            }
+            if ($response['content'] !== null) {
+                $parsed = ai_parse_json_response($response['content'], $allowedTypes);
+                if ($parsed !== null) {
+                    $result = $parsed;
+                    $provider = 'openrouter';
+                    $openrouterModelUsed = $model;
+                    break;
+                }
+            }
         }
     }
 
+    // 2. OpenAI, if OpenRouter didn't produce a usable result.
+    if ($result === null) {
+        $openaiResponse = ai_call_openai($openaiKey, $prompt);
+        $openaiInputTokens = $openaiResponse['input_tokens'];
+        $openaiOutputTokens = $openaiResponse['output_tokens'];
+        if ($openaiResponse['content'] !== null) {
+            $parsed = ai_parse_json_response($openaiResponse['content'], $allowedTypes);
+            if ($parsed !== null) {
+                $result = $parsed;
+                $provider = 'openai';
+            }
+        }
+    }
+
+    // 3. Claude, as the last resort.
     if ($result === null) {
         $anthropicResponse = ai_call_anthropic($anthropicKey, $prompt);
         $anthropicInputTokens = $anthropicResponse['input_tokens'];
@@ -226,22 +316,24 @@ function ai_categorize(
     }
 
     if ($result === null) {
-        $errorMessage = ($openaiKey === '' && $anthropicKey === '')
+        $errorMessage = ($openaiKey === '' && $anthropicKey === '' && $openrouterKey === '')
             ? 'No AI provider configured.'
-            : 'Both providers failed or returned an unusable response.';
+            : 'All configured providers failed or returned an unusable response.';
     }
 
     $stmt = $pdo->prepare(
         'INSERT INTO ai_suggestions_log
             (user_id, business_id, context, description, amount, suggested_type, suggested_category, confidence,
              provider, openai_input_tokens, openai_output_tokens, anthropic_input_tokens, anthropic_output_tokens,
+             openrouter_input_tokens, openrouter_output_tokens, openrouter_model_used,
              success, error_message)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $userId, $businessId, $context, $description, $amount,
         $result['type'] ?? null, $result['category'] ?? null, $result['confidence'] ?? null,
         $provider, $openaiInputTokens, $openaiOutputTokens, $anthropicInputTokens, $anthropicOutputTokens,
+        $openrouterInputTokens, $openrouterOutputTokens, $openrouterModelUsed,
         $result !== null ? 1 : 0, $errorMessage,
     ]);
 
@@ -250,6 +342,7 @@ function ai_categorize(
         'category' => $result['category'] ?? null,
         'confidence' => $result['confidence'] ?? null,
         'provider' => $provider,
+        'model' => $openrouterModelUsed,
         'success' => $result !== null,
     ];
 }
