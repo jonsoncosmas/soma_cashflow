@@ -24,9 +24,13 @@ function ai_build_prompt(string $description, ?float $amount, array $allowedType
     $amountPart = $amount !== null ? "Amount: {$amount}." : '';
 
     return "A user is logging a financial transaction for a small business/personal finance app in Tanzania. " .
-        "Description: \"{$description}\". {$amountPart} " .
-        "Classify it. Respond with ONLY a JSON object, no other text, no markdown fences, in exactly this shape: " .
-        '{"type": "<one of: ' . $typesList . '>", "category": "<a short category name, prefer one of: ' . $catList . ', or invent a short one if none fit>", "confidence": <number 0 to 1>}';
+        "Their raw description (may be shorthand, typos, or gibberish): \"{$description}\". {$amountPart} " .
+        "Classify it, AND rewrite their raw description into a short, clear, professional transaction description " .
+        "(fix typos/shorthand, keep it factual, do not invent details the raw text doesn't imply; if the raw text is " .
+        "pure gibberish with no discernible meaning, leave the description field as an empty string instead of guessing). " .
+        "Respond with ONLY a JSON object, no other text, no markdown fences, in exactly this shape: " .
+        '{"type": "<one of: ' . $typesList . '>", "category": "<a short category name, prefer one of: ' . $catList . ', or invent a short one if none fit>", ' .
+        '"description": "<cleaned-up description, or empty string if the raw text was meaningless>", "confidence": <number 0 to 1>}';
 }
 
 /**
@@ -68,7 +72,18 @@ function ai_parse_json_response(string $raw, array $allowedTypes): ?array
     $confidence = isset($data['confidence']) ? (float) $data['confidence'] : 0.5;
     $confidence = max(0.0, min(1.0, $confidence));
 
-    return ['type' => $type, 'category' => $category, 'confidence' => $confidence];
+    // Optional: the AI's cleaned-up description. Absent, non-string, or
+    // empty all mean "no usable rewrite" - never a reason to reject the
+    // whole response, since type/category are the required part.
+    $cleanedDescription = null;
+    if (isset($data['description']) && is_string($data['description'])) {
+        $trimmed = trim($data['description']);
+        if ($trimmed !== '') {
+            $cleanedDescription = $trimmed;
+        }
+    }
+
+    return ['type' => $type, 'category' => $category, 'confidence' => $confidence, 'description' => $cleanedDescription];
 }
 
 /**
@@ -323,15 +338,15 @@ function ai_categorize(
 
     $stmt = $pdo->prepare(
         'INSERT INTO ai_suggestions_log
-            (user_id, business_id, context, description, amount, suggested_type, suggested_category, confidence,
+            (user_id, business_id, context, description, amount, suggested_type, suggested_category, suggested_description, confidence,
              provider, openai_input_tokens, openai_output_tokens, anthropic_input_tokens, anthropic_output_tokens,
              openrouter_input_tokens, openrouter_output_tokens, openrouter_model_used,
              success, error_message)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $userId, $businessId, $context, $description, $amount,
-        $result['type'] ?? null, $result['category'] ?? null, $result['confidence'] ?? null,
+        $result['type'] ?? null, $result['category'] ?? null, $result['description'] ?? null, $result['confidence'] ?? null,
         $provider, $openaiInputTokens, $openaiOutputTokens, $anthropicInputTokens, $anthropicOutputTokens,
         $openrouterInputTokens, $openrouterOutputTokens, $openrouterModelUsed,
         $result !== null ? 1 : 0, $errorMessage,
@@ -340,6 +355,7 @@ function ai_categorize(
     return [
         'type' => $result['type'] ?? null,
         'category' => $result['category'] ?? null,
+        'description' => $result['description'] ?? null,
         'confidence' => $result['confidence'] ?? null,
         'provider' => $provider,
         'model' => $openrouterModelUsed,

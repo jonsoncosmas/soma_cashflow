@@ -209,6 +209,9 @@ async function somaAiSuggest() {
         if (data.success) {
             document.getElementById('type').value = data.type;
             document.getElementById('category').value = data.category;
+            if (data.description) {
+                document.getElementById('description').value = data.description;
+            }
             var providerLabel = data.provider === 'openrouter' ? 'openrouter (' + data.model + ')' : data.provider;
             status.textContent = 'Suggested by ' + providerLabel + ' (' + Math.round(data.confidence * 100) + '% confidence) — review before saving.';
         } else {

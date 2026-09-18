@@ -40,8 +40,16 @@ return [
     'ai' => [
         'openrouter_api_key' => '',
         'openrouter_models'  => [
-            // 'meta-llama/llama-3.3-70b-instruct:free',
-            // 'google/gemma-3-27b-it:free',
+            // 'nvidia/nemotron-3-ultra-550b-a55b:free',
+            // 'thinkingmachines/inkling:free',
+            // 'dots-studio/dots-3-note-preview:free',
+            // 'nvidia/nemotron-3-super-120b-a12b:free',
+            // 'poolside/laguna-s-2.1:free',
+            // 'inclusionai/ling-3.0-flash-vl:free',
+            // 'nex-agi/nex-n2.5-pro:free',
+            // 'thinkingmachines/inkling-small:free',
+            // 'nvidia/nemotron-3.5-lightning:free',
+            // 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
         ],
         'openai_api_key'    => '',
         'anthropic_api_key' => '',
