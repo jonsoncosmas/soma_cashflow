@@ -53,5 +53,24 @@ return [
         ],
         'openai_api_key'    => '',
         'anthropic_api_key' => '',
+
+        // Optional daily caps per provider, to stop before you blow past a
+        // free tier or run up an unexpected bill. Each provider can have a
+        // 'requests' cap (count of AI-suggestion calls today), a 'tokens'
+        // cap (input+output tokens today), or both - whichever is set
+        // first stops that provider for the rest of the day, and the chain
+        // falls through to the next provider automatically. Leave a
+        // provider out entirely (or set both to null) for no cap.
+        //
+        // Note: this caps OpenRouter as a whole, not each individual free
+        // model separately - real OpenRouter free-tier limits are actually
+        // per-model (e.g. ~200 requests/day per model), so a single
+        // provider-level cap here is a simpler approximation, not an exact
+        // match to their per-model limits.
+        'daily_caps' => [
+            'openrouter' => ['requests' => 150, 'tokens' => null],
+            'openai'     => ['requests' => null, 'tokens' => null],
+            'anthropic'  => ['requests' => null, 'tokens' => null],
+        ],
     ],
 ];

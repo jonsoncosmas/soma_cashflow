@@ -252,6 +252,63 @@ function ai_call_openrouter(string $apiKey, string $model, string $prompt): arra
  *
  * Returns ['type'=>?,'category'=>?,'confidence'=>?,'provider'=>?,'success'=>bool].
  */
+/**
+ * Today's request count and total token volume (input+output) logged for
+ * a given provider, across all users - the cap protects the shared API
+ * key's daily quota, not any one person's usage.
+ */
+function ai_get_daily_usage(PDO $pdo, string $provider): array
+{
+    // Whitelist, since $provider ends up in raw SQL column names below.
+    if (!in_array($provider, ['openai', 'anthropic', 'openrouter'], true)) {
+        return ['requests' => 0, 'tokens' => 0];
+    }
+    $inputCol = $provider . '_input_tokens';
+    $outputCol = $provider . '_output_tokens';
+
+    $stmt = $pdo->query(
+        "SELECT COUNT(*) AS requests, COALESCE(SUM({$inputCol} + {$outputCol}), 0) AS tokens
+         FROM ai_suggestions_log
+         WHERE DATE(created_at) = CURDATE() AND {$inputCol} IS NOT NULL"
+    );
+    $row = $stmt->fetch();
+    return ['requests' => (int) $row['requests'], 'tokens' => (int) $row['tokens']];
+}
+
+/**
+ * True if this provider has hit its configured daily request or token cap
+ * (whichever is set) and should be skipped in favor of the next provider
+ * in the chain. A provider with no caps configured is always allowed.
+ *
+ * Note: this caps at the PROVIDER level, not per individual OpenRouter
+ * model - real OpenRouter free-tier limits are actually per-model, but the
+ * log only records which model succeeded, not every model attempted, so
+ * precise per-model capping isn't possible without a bigger schema change.
+ * A provider-level cap still protects you from blowing through the
+ * combined daily quota, just without that finer granularity.
+ */
+function ai_provider_capped(PDO $pdo, string $provider, array $config): bool
+{
+    $caps = $config['ai']['daily_caps'][$provider] ?? null;
+    if (!$caps) {
+        return false;
+    }
+    $requestCap = $caps['requests'] ?? null;
+    $tokenCap = $caps['tokens'] ?? null;
+    if ($requestCap === null && $tokenCap === null) {
+        return false;
+    }
+
+    $usage = ai_get_daily_usage($pdo, $provider);
+    if ($requestCap !== null && $usage['requests'] >= $requestCap) {
+        return true;
+    }
+    if ($tokenCap !== null && $usage['tokens'] >= $tokenCap) {
+        return true;
+    }
+    return false;
+}
+
 function ai_categorize(
     PDO $pdo,
     array $config,
@@ -279,61 +336,79 @@ function ai_categorize(
     $openrouterInputTokens = null;
     $openrouterOutputTokens = null;
     $openrouterModelUsed = null;
+    $cappedProviders = [];
 
-    // 1. OpenRouter: try each configured model in order until one works.
+    // 1. OpenRouter: try each configured model in order until one works,
+    // unless the whole provider has already hit its daily cap today.
     if ($openrouterKey !== '' && $openrouterModels) {
-        foreach ($openrouterModels as $model) {
-            $response = ai_call_openrouter($openrouterKey, $model, $prompt);
-            if ($response['input_tokens'] !== null) {
-                $openrouterInputTokens = ($openrouterInputTokens ?? 0) + $response['input_tokens'];
-            }
-            if ($response['output_tokens'] !== null) {
-                $openrouterOutputTokens = ($openrouterOutputTokens ?? 0) + $response['output_tokens'];
-            }
-            if ($response['content'] !== null) {
-                $parsed = ai_parse_json_response($response['content'], $allowedTypes);
-                if ($parsed !== null) {
-                    $result = $parsed;
-                    $provider = 'openrouter';
-                    $openrouterModelUsed = $model;
-                    break;
+        if (ai_provider_capped($pdo, 'openrouter', $config)) {
+            $cappedProviders[] = 'openrouter';
+        } else {
+            foreach ($openrouterModels as $model) {
+                $response = ai_call_openrouter($openrouterKey, $model, $prompt);
+                if ($response['input_tokens'] !== null) {
+                    $openrouterInputTokens = ($openrouterInputTokens ?? 0) + $response['input_tokens'];
+                }
+                if ($response['output_tokens'] !== null) {
+                    $openrouterOutputTokens = ($openrouterOutputTokens ?? 0) + $response['output_tokens'];
+                }
+                if ($response['content'] !== null) {
+                    $parsed = ai_parse_json_response($response['content'], $allowedTypes);
+                    if ($parsed !== null) {
+                        $result = $parsed;
+                        $provider = 'openrouter';
+                        $openrouterModelUsed = $model;
+                        break;
+                    }
                 }
             }
         }
     }
 
-    // 2. OpenAI, if OpenRouter didn't produce a usable result.
-    if ($result === null) {
-        $openaiResponse = ai_call_openai($openaiKey, $prompt);
-        $openaiInputTokens = $openaiResponse['input_tokens'];
-        $openaiOutputTokens = $openaiResponse['output_tokens'];
-        if ($openaiResponse['content'] !== null) {
-            $parsed = ai_parse_json_response($openaiResponse['content'], $allowedTypes);
-            if ($parsed !== null) {
-                $result = $parsed;
-                $provider = 'openai';
+    // 2. OpenAI, if OpenRouter didn't produce a usable result and isn't capped.
+    if ($result === null && $openaiKey !== '') {
+        if (ai_provider_capped($pdo, 'openai', $config)) {
+            $cappedProviders[] = 'openai';
+        } else {
+            $openaiResponse = ai_call_openai($openaiKey, $prompt);
+            $openaiInputTokens = $openaiResponse['input_tokens'];
+            $openaiOutputTokens = $openaiResponse['output_tokens'];
+            if ($openaiResponse['content'] !== null) {
+                $parsed = ai_parse_json_response($openaiResponse['content'], $allowedTypes);
+                if ($parsed !== null) {
+                    $result = $parsed;
+                    $provider = 'openai';
+                }
             }
         }
     }
 
-    // 3. Claude, as the last resort.
-    if ($result === null) {
-        $anthropicResponse = ai_call_anthropic($anthropicKey, $prompt);
-        $anthropicInputTokens = $anthropicResponse['input_tokens'];
-        $anthropicOutputTokens = $anthropicResponse['output_tokens'];
-        if ($anthropicResponse['content'] !== null) {
-            $parsed = ai_parse_json_response($anthropicResponse['content'], $allowedTypes);
-            if ($parsed !== null) {
-                $result = $parsed;
-                $provider = 'anthropic';
+    // 3. Claude, as the last resort - same cap check.
+    if ($result === null && $anthropicKey !== '') {
+        if (ai_provider_capped($pdo, 'anthropic', $config)) {
+            $cappedProviders[] = 'anthropic';
+        } else {
+            $anthropicResponse = ai_call_anthropic($anthropicKey, $prompt);
+            $anthropicInputTokens = $anthropicResponse['input_tokens'];
+            $anthropicOutputTokens = $anthropicResponse['output_tokens'];
+            if ($anthropicResponse['content'] !== null) {
+                $parsed = ai_parse_json_response($anthropicResponse['content'], $allowedTypes);
+                if ($parsed !== null) {
+                    $result = $parsed;
+                    $provider = 'anthropic';
+                }
             }
         }
     }
 
     if ($result === null) {
-        $errorMessage = ($openaiKey === '' && $anthropicKey === '' && $openrouterKey === '')
-            ? 'No AI provider configured.'
-            : 'All configured providers failed or returned an unusable response.';
+        if ($openaiKey === '' && $anthropicKey === '' && $openrouterKey === '') {
+            $errorMessage = 'No AI provider configured.';
+        } elseif ($cappedProviders) {
+            $errorMessage = 'Daily cap reached for: ' . implode(', ', $cappedProviders) . '.';
+        } else {
+            $errorMessage = 'All configured providers failed or returned an unusable response.';
+        }
     }
 
     $stmt = $pdo->prepare(
