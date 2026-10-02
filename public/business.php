@@ -260,9 +260,9 @@ require __DIR__ . '/../includes/header.php';
                        onfocus="this.type='date'" onblur="if(!this.value)this.type='text'">
             </div>
             <div class="full">
-                <label for="description">Description (optional, but helps AI suggest a category)</label>
+                <label for="description">Description (optional, but helps ORION suggest a category)</label>
                 <input type="text" id="description" name="description" value="<?= h($_POST['description'] ?? '') ?>" placeholder="e.g. Bought timber for coop construction">
-                <button type="button" id="ai-suggest-btn" onclick="somaAiSuggest()" style="margin-top:8px; background:var(--brand-100); color:var(--brand-700); box-shadow:none; padding:8px 14px; font-size:0.85rem;">✨ Suggest with AI</button>
+                <button type="button" id="ai-suggest-btn" onclick="somaAiSuggest()" style="margin-top:8px; background:var(--brand-100); color:var(--brand-700); box-shadow:none; padding:8px 14px; font-size:0.85rem;">✨ Suggest with ORION</button>
                 <span id="ai-suggest-status" class="muted" style="margin-left:8px; font-size:0.82rem;"></span>
             </div>
         </div>
@@ -293,13 +293,12 @@ async function somaAiSuggest() {
             if (data.description) {
                 document.getElementById('description').value = data.description;
             }
-            var providerLabel = data.provider === 'openrouter' ? 'openrouter (' + data.model + ')' : data.provider;
-            status.textContent = 'Suggested by ' + providerLabel + ' (' + Math.round(data.confidence * 100) + '% confidence) — review before saving.';
+            status.textContent = 'Suggested by ORION (' + Math.round(data.confidence * 100) + '% confidence) — review before saving.';
         } else {
             status.textContent = 'Could not get a suggestion — pick manually.';
         }
     } catch (e) {
-        status.textContent = 'Could not reach AI service — pick manually.';
+        status.textContent = 'Could not reach ORION — pick manually.';
     }
 }
 </script>

@@ -63,4 +63,13 @@ if ($context === 'business') {
 
 $result = ai_categorize($pdo, $config, $user['id'], $businessId, $context, $description, $amount, $allowedTypes, $categorySuggestions);
 
-echo json_encode($result);
+// Never expose which backend actually answered - not even in the raw
+// response - so a client inspecting network traffic can't identify the
+// providers behind ORION. Only the outcome ever reaches the browser.
+echo json_encode([
+    'type' => $result['type'],
+    'category' => $result['category'],
+    'description' => $result['description'],
+    'confidence' => $result['confidence'],
+    'success' => $result['success'],
+]);

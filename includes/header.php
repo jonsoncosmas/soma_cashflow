@@ -366,7 +366,7 @@ function nav_active(string $path, string $needle): string
                 <span class="navicon">&#128200;</span> Investments
             </a>
             <a class="<?= nav_active((string) $currentPath, 'ai_usage.php') ?>" href="/soma_cashflow/public/ai_usage.php">
-                <span class="navicon">&#129302;</span> AI Usage
+                <span class="navicon">&#129302;</span> ORION AI Usage
             </a>
         </nav>
         <div class="user-card">
